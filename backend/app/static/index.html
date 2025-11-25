@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Task Queue Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .tenant-info {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        input, button, select {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        input {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #5568d3;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        
+        .metric-label {
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        
+        .jobs-section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .section-title {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .filter-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-controls button {
+            padding: 8px 12px;
+            font-size: 13px;
+            background: #e9ecef;
+            color: #333;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        
+        .filter-controls button.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .jobs-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .job-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+        
+        .job-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .job-info {
+            flex: 1;
+        }
+        
+        .job-id {
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .job-payload {
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .job-meta {
+            font-size: 12px;
+            color: #999;
+        }
+        
+        .job-status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-right: 10px;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-running {
+            background: #cfe2ff;
+            color: #084298;
+        }
+        
+        .status-done {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+        
+        .status-failed {
+            background: #f8d7da;
+            color: #842029;
+        }
+        
+        .status-dead_letter {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+        
+        .alert {
+            padding: 12px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        
+        .alert-success {
+            background: #d1e7dd;
+            color: #0f5132;
+            border: 1px solid #badbcc;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #842029;
+            border: 1px solid #f5c2c7;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 5px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Distributed Task Queue Dashboard</h1>
+            <div class="tenant-info">Tenant: <strong id="tenantId">tenant-demo</strong></div>
+            <div class="input-group">
+                <input type="text" id="jobPayload" placeholder="Job payload (JSON)" value='{"task": "process", "data": "sample"}'>
+                <input type="text" id="idempotencyKey" placeholder="Idempotency key (optional)">
+                <button onclick="submitJob()">📤 Submit Job</button>
+            </div>
+        </header>
+        
+        <div id="alert"></div>
+        
+        <div class="metrics-grid" id="metricsGrid"></div>
+        
+        <div class="jobs-section">
+            <div class="section-title">
+                📋 Jobs
+                <div class="filter-controls">
+                    <button class="active" onclick="filterJobs('all')">All</button>
+                    <button onclick="filterJobs('pending')">Pending</button>
+                    <button onclick="filterJobs('running')">Running</button>
+                    <button onclick="filterJobs('done')">Done</button>
+                    <button onclick="filterJobs('dead_letter')">DLQ</button>
+                    <button onclick="refreshJobs()" style="background: #667eea; color: white;">🔄 Refresh</button>
+                </div>
+            </div>
+            <div class="jobs-list" id="jobsList">
+                <div class="empty-state">Loading jobs...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = "http://localhost:8000/api";
+        const TENANT_ID = "tenant-demo";
+        
+        let currentFilter = "all";
+        let metricsWS = null;
+        
+        // ===== INITIALIZATION =====
+        
+        function init() {
+            document.getElementById("tenantId").textContent = TENANT_ID;
+            connectMetricsWS();
+            refreshJobs();
+            setInterval(refreshJobs, 5000);
+        }
+        
+        // ===== WEBSOCKET FOR METRICS =====
+        
+        function connectMetricsWS() {
+            const wsURL = "ws://localhost:8000/ws/metrics";
+            metricsWS = new WebSocket(wsURL);
+            
+            metricsWS.onmessage = (event) => {
+                const metrics = JSON.parse(event.data);
+                updateMetrics(metrics);
+            };
+            
+            metricsWS.onerror = () => {
+                console.error("WebSocket error");
+                setTimeout(connectMetricsWS, 3000);
+            };
+        }
+        
+        function updateMetrics(metrics) {
+            const metricsGrid = document.getElementById("metricsGrid");
+            metricsGrid.innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-label">Pending</div>
+                    <div class="metric-value">${metrics.pending}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Running</div>
+                    <div class="metric-value">${metrics.running}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Completed</div>
+                    <div class="metric-value">${metrics.done}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Failed</div>
+                    <div class="metric-value">${metrics.failed}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Dead Letter</div>
+                    <div class="metric-value">${metrics.dead_letter_queue}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Tenants</div>
+                    <div class="metric-value">${metrics.active_tenants}</div>
+                </div>
+            `;
+        }
+        
+        // ===== JOB OPERATIONS =====
+        
+        async function submitJob() {
+            const payloadInput = document.getElementById("jobPayload").value;
+            const idempotencyKey = document.getElementById("idempotencyKey").value;
+            
+            try {
+                let payload = JSON.parse(payloadInput);
+                
+                const response = await fetch(`${API_URL}/jobs`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Tenant-ID": TENANT_ID
+                    },
+                    body: JSON.stringify({
+                        payload: payload,
+                        idempotency_key: idempotencyKey || null,
+                        max_retries: 3
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    showAlert(`Error: ${error.detail}`, "error");
+                    return;
+                }
+                
+                const data = await response.json();
+                showAlert(`✅ Job submitted: ${data.job_id}`, "success");
+                document.getElementById("jobPayload").value = '';
+                document.getElementById("idempotencyKey").value = '';
+                refreshJobs();
+            } catch (e) {
+                showAlert(`Error: ${e.message}`, "error");
+            }
+        }
+        
+        async function refreshJobs() {
+            try {
+                let url = `${API_URL}/jobs`;
+                if (currentFilter !== "all") {
+                    url += `?status=${currentFilter}`;
+                }
+                
+                const response = await fetch(url, {
+                    headers: { "X-Tenant-ID": TENANT_ID }
+                });
+                
+                if (!response.ok) throw new Error("Failed to fetch jobs");
+                
+                const data = await response.json();
+                renderJobs(data.jobs);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        
+        function renderJobs(jobs) {
+            const jobsList = document.getElementById("jobsList");
+            
+            if (jobs.length === 0) {
+                jobsList.innerHTML = '<div class="empty-state">No jobs found</div>';
+                return;
+            }
+            
+            jobsList.innerHTML = jobs.map(job => `
+                <div class="job-item">
+                    <div class="job-info">
+                        <div class="job-id">ID: ${job.id}</div>
+                        <div class="job-payload">${JSON.stringify(job.payload)}</div>
+                        <div class="job-meta">
+                            Created: ${new Date(job.created_at).toLocaleString()}
+                            ${job.retry_count > 0 ? ` • Retries: ${job.retry_count}` : ''}
+                            ${job.error_message ? ` • Error: ${job.error_message}` : ''}
+                        </div>
+                    </div>
+                    <span class="job-status status-${job.status}">
+                        ${job.status === 'running' ? '<span class="spinner"></span>' : ''}
+                        ${job.status.replace('_', ' ')}
+                    </span>
+                </div>
+            `).join('');
+        }
+        
+        function filterJobs(status) {
+            // Update button states
+            document.querySelectorAll(".filter-controls button").forEach(btn => {
+                btn.classList.remove("active");
+            });
+            event.target.classList.add("active");
+            
+            currentFilter = status;
+            refreshJobs();
+        }
+        
+        function showAlert(message, type) {
+            const alertDiv = document.getElementById("alert");
+            alertDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => {
+                alertDiv.innerHTML = '';
+            }, 4000);
+        }
+        
+        // Start the app
+        init();
+    </script>
+</body>
+</html>
